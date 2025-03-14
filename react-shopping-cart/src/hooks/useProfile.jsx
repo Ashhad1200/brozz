@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { doc, updateDoc } from 'firebase/firestore';
 
-import { db } from 'db/config';
+import { db } from '../firebase/firebase-config';
 
 import { useAuthContext } from './useAuthContext';
 

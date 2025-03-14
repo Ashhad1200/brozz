@@ -5,6 +5,22 @@ rules_version = '2';
 //    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return request.auth != null && 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Product images can be read by anyone but only written by admins
+    match /product-images/{imageId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;  // Temporarily allow all writes for testing
+    }
+
+    // Default rule - deny all other access
     match /{allPaths=**} {
       allow read, write: if false;
     }

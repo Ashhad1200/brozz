@@ -3,9 +3,9 @@ import { v4 as uuid } from 'uuid';
 
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 
-import { db } from 'db/config';
+import { db } from '../firebase/firebase-config';
 
-import { useAuthContext } from 'hooks/useAuthContext';
+import { useAuthContext } from './useAuthContext';
 
 import { handleError } from 'helpers/error/handleError';
 

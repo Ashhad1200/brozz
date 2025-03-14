@@ -1,5 +1,4 @@
 import { useState, useRef } from 'react';
-import { v4 as uuid } from 'uuid';
 
 import {
   collection,
@@ -9,173 +8,96 @@ import {
   orderBy,
   startAfter,
   limit,
+  getCountFromServer
 } from 'firebase/firestore';
 
-import { db } from 'db/config';
-
-import { formatDiscountNumber } from 'helpers/format';
+import { db } from '../firebase/firebase-config';
+  
+const ITEMS_PER_PAGE = 4;
 
 export const useCollection = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
 
   const productsRef = collection(db, 'products');
-
   const latestDoc = useRef();
 
-  const getCollection = async ({
-    collectionName = 'products',
-    isNewQuery = true,
-    sortBy = { field: 'createdAt', direction: 'asc' },
-  }) => {
+  const getCollection = async (options = {}) => {
+    const {
+      collectionName = 'products',
+      isNewQuery = true,
+      sortBy = { field: 'createdAt', direction: 'asc' }
+    } = options;
+
     setError(null);
+    setIsLoading(true);
 
     try {
       if (isNewQuery) {
-        latestDoc.current = 0;
+        latestDoc.current = null;
         setHasMore(true);
+
+        // Get total count for the collection
+        const countQuery = query(productsRef);
+        const snapshot = await getCountFromServer(countQuery);
+        setTotalCount(snapshot.data().count);
       }
 
-      let productsQuery;
-
-      let constraints = [orderBy(sortBy.field, sortBy.direction)];
-
-      if (sortBy.field === 'createdAt') {
-        constraints.unshift(orderBy('collection'));
+      // Simplified query without complex filtering
+      let constraints = [];
+      
+      if (collectionName !== 'products') {
+        constraints.push(where('collection', '==', collectionName));
       }
 
-      if (sortBy.direction === 'desc' && !latestDoc.current) {
-        constraints.push(limit(4));
-      } else {
-        constraints.push(
-          startAfter(isNewQuery ? 0 : latestDoc.current),
-          limit(4)
-        );
+      // Add basic sorting
+      if (sortBy.field !== 'price') {
+        constraints.push(orderBy(sortBy.field, sortBy.direction));
       }
 
-      if (collectionName === 'products') {
-        productsQuery = query(productsRef, ...constraints);
-      } else {
-        productsQuery = query(
-          productsRef,
-          where('collection', '==', collectionName),
-          ...constraints
-        );
+      if (latestDoc.current) {
+        constraints.push(startAfter(latestDoc.current));
       }
 
+      constraints.push(limit(ITEMS_PER_PAGE));
+
+      const productsQuery = query(productsRef, ...constraints);
       const productsSnapshot = await getDocs(productsQuery);
 
-      if (productsSnapshot.size === 0) {
+      if (productsSnapshot.empty) {
         setHasMore(false);
         setIsLoading(false);
         return [];
       }
 
-      setIsLoading(true);
+      latestDoc.current = productsSnapshot.docs[productsSnapshot.docs.length - 1];
+      setHasMore(productsSnapshot.docs.length === ITEMS_PER_PAGE);
 
-      latestDoc.current =
-        productsSnapshot.docs[productsSnapshot.docs.length - 1];
+      const products = productsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
 
-      const productsPromises = productsSnapshot.docs.map(async (productDoc) => {
-        const productData = {
-          productId: productDoc.id,
-          ...productDoc.data(),
-        };
-
-        const skusRef = collection(productDoc.ref, 'skus');
-
-        const skusQuery = query(skusRef, orderBy('order'));
-
-        const skusSnapshot = await getDocs(skusQuery);
-
-        const skus = [];
-
-        skusSnapshot.forEach((skuDoc) =>
-          skus.push({
-            skuId: skuDoc.id,
-            ...skuDoc.data(),
-          })
-        );
-
-        const variantsRef = collection(productDoc.ref, 'variants');
-
-        const variantsSnapshot = await getDocs(variantsRef);
-
-        const productVariants = [];
-
-        variantsSnapshot.forEach((variantDoc) => {
-          let variantSkus = skus
-            .filter((sku) => sku.variantId === variantDoc.id)
-            .map((sku) => ({
-              size: sku.size,
-              skuId: sku.skuId,
-              quantity: sku.quantity,
-            }));
-
-          let availableQuantity = variantSkus.reduce((result, obj) => {
-            if (!obj.size) {
-              result['singleSize'] = obj.quantity;
-            } else {
-              result[obj.size] = obj.quantity;
-            }
-            return result;
-          }, {});
-
-          const sizes = Object.keys(availableQuantity);
-
-          const isSoldOut = variantSkus.every((sku) => sku.quantity === 0);
-
-          const { price: actualPrice, ...restProductData } = productData;
-          const {
-            variantPrice: currentPrice,
-            images: variantImages,
-            ...restVariantData
-          } = variantDoc.data();
-
-          const formattedVariantImages = variantImages.map((image) => ({
-            ...image,
-            url: `${restProductData.slug}-${restVariantData.color}`,
-          }));
-
-          productVariants.push({
-            variantId: variantDoc.id,
-            price: currentPrice,
-            actualPrice,
-            ...restProductData,
-            ...restVariantData,
-            slides: formattedVariantImages,
-            numberOfVariants: variantsSnapshot.size,
-            availableQuantity,
-            sizes,
-            skus: variantSkus,
-            discount: formatDiscountNumber({
-              currentPrice,
-              actualPrice,
-            }),
-            isSoldOut,
-          });
+      // If sorting by price, do it in memory
+      if (sortBy.field === 'price') {
+        products.sort((a, b) => {
+          const priceA = a.price || 0;
+          const priceB = b.price || 0;
+          return sortBy.direction === 'asc' ? priceA - priceB : priceB - priceA;
         });
-
-        const formattedProductVariants = productVariants.map((variant) => ({
-          ...variant,
-          id: uuid(),
-          allVariants: productVariants,
-        }));
-
-        return formattedProductVariants;
-      });
-
-      const products = await Promise.all(productsPromises);
+      }
 
       setIsLoading(false);
-      return [].concat(...products);
+      return products;
     } catch (err) {
       console.error(err);
       setError(err);
       setIsLoading(false);
+      return [];
     }
   };
 
-  return { getCollection, isLoading, hasMore, error };
+  return { getCollection, isLoading, error, hasMore, totalCount };
 };

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Navigation } from 'swiper';
 
 import { useCart } from 'hooks/useCart';
@@ -16,6 +16,7 @@ const ProductCard = ({
   variantId,
   model,
   color,
+  colorDisplay,
   currentPrice,
   actualPrice,
   type,
@@ -31,9 +32,9 @@ const ProductCard = ({
   onTouchEnd,
   expandableClassName,
   onCardPick,
+  isAdmin
 }) => {
   const location = useLocation();
-  const isAdmin = location.pathname.split('/')[1] === 'admin';
 
   const { addItem, isLoading } = useCart();
 
@@ -261,7 +262,7 @@ const ProductCard = ({
           </ul>
         </div>
 
-        {/* {isAdmin && (
+        {isAdmin && (
           <div className={styles.admin_buttons_wrapper}>
             <Button className={styles.edit} to={`/admin/products/${productId}`}>
               Edit
@@ -279,7 +280,7 @@ const ProductCard = ({
               Delete
             </Button>
           </div>
-        )} */}
+        )}
       </div>
     </>
   );

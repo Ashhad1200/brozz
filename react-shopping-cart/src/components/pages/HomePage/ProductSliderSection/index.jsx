@@ -36,12 +36,14 @@ const ProductSliderSection = ({ titleTop, titleBottom, sortBy }) => {
       // Check if fetchedVariants is defined before sorting
       if (fetchedVariants) {
         setSlides(
-          fetchedVariants.sort((a, b) =>
-            a.color.toUpperCase() > b.color.toUpperCase() ? 1 : -1
-          )
+          fetchedVariants.sort((a, b) => {
+            const colorA = a.color || '';
+            const colorB = b.color || '';
+            return colorA.toUpperCase() > colorB.toUpperCase() ? 1 : -1;
+          })
         );
       } else {
-          setSlides([]); // set empty array if data is not available.
+        setSlides([]); // set empty array if data is not available.
       }
     })();
   }, []);

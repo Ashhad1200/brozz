@@ -1,7 +1,5 @@
 import { useState } from 'react';
-
 import { v4 as uuid } from 'uuid';
-
 import {
   writeBatch,
   doc,
@@ -18,13 +16,19 @@ import {
   uploadBytes,
   getDownloadURL,
   deleteObject,
+  uploadBytesResumable
 } from 'firebase/storage';
 
-import { db, storage } from 'db/config';
+import { db, storage } from '../firebase/firebase-config';
+import { handleError } from 'helpers/error/handleError';
+import { cloudinaryConfig } from '../config/cloudinary';
+
+const { cloudName, apiKey, generateSignature } = cloudinaryConfig;
 
 export const useAdmin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const skuSizeCode = {
     s: 'sm',
@@ -36,6 +40,7 @@ export const useAdmin = () => {
 
   const uploadFiles = async (directory, { currentFiles, newFiles }) => {
     setError(null);
+    setUploadProgress(0);
     try {
       const updatedFiles = [...currentFiles];
 
@@ -47,29 +52,103 @@ export const useAdmin = () => {
             (image) => image.name === newFile.name
           );
 
-          const id = uuid();
-          const uploadPath = `${directory}/${id}/${newFile.name}`;
-          const storageRef = ref(storage, uploadPath);
-          await uploadBytes(storageRef, newFile);
-          const fileURL = await getDownloadURL(storageRef);
-
           if (!checkForExistingImage) {
-            updatedFiles.push({ id, name: newFile.name, src: fileURL });
+            const id = uuid();
+            const timestamp = Math.floor(Date.now() / 1000);
+            
+            // Create form data for Cloudinary upload
+            const formData = new FormData();
+            formData.append('file', newFile);
+            formData.append('api_key', apiKey);
+            formData.append('timestamp', timestamp);
+            formData.append('folder', directory);
+
+            // Generate signature
+            const signature = generateSignature({
+              folder: directory,
+              timestamp
+            });
+            formData.append('signature', signature);
+
+            try {
+              // Upload to Cloudinary
+              const response = await fetch(
+                `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+                {
+                  method: 'POST',
+                  body: formData
+                }
+              );
+
+              if (!response.ok) {
+                const errorData = await response.json();
+                console.error('Cloudinary error:', errorData);
+                throw new Error(`Failed to upload to Cloudinary: ${errorData.error?.message || 'Unknown error'}`);
+              }
+
+              const data = await response.json();
+              
+              // Add the uploaded file to our list
+              updatedFiles.push({
+                id,
+                name: newFile.name,
+                src: data.secure_url,
+                public_id: data.public_id
+              });
+              
+              setUploadProgress(100);
+            } catch (uploadError) {
+              console.error('Error during file upload:', uploadError);
+              throw uploadError;
+            }
           }
         }
       }
 
       return updatedFiles;
     } catch (err) {
-      setError(err);
+      console.error('Upload files error:', err);
+      setError(handleError(err));
+      return currentFiles;
     }
   };
 
-  const deleteFile = (directory, file) => {
-    const uploadPath = `${directory}/${file.id}/${file.name}`;
-    const storageRef = ref(storage, uploadPath);
+  const deleteFile = async (directory, file) => {
+    setError(null);
+    try {
+      // Delete from Cloudinary using the public_id
+      if (file.public_id) {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const formData = new FormData();
+        formData.append('public_id', file.public_id);
+        formData.append('api_key', apiKey);
+        formData.append('timestamp', timestamp);
 
-    deleteObject(storageRef);
+        // Generate signature
+        const signature = generateSignature({
+          public_id: file.public_id,
+          timestamp
+        });
+        formData.append('signature', signature);
+
+        const response = await fetch(
+          `https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`,
+          {
+            method: 'POST',
+            body: formData
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Cloudinary error:', errorData);
+          throw new Error(`Failed to delete from Cloudinary: ${errorData.error?.message || 'Unknown error'}`);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setError(handleError(err));
+    }
   };
 
   const getProduct = async (productId) => {
@@ -80,71 +159,18 @@ export const useAdmin = () => {
       const productRef = doc(db, 'products', productId);
       const docSnap = await getDoc(productRef);
 
+      if (!docSnap.exists()) {
+        throw new Error('Product not found');
+      }
+
       const product = { id: docSnap.id, ...docSnap.data() };
-
-      let images = [];
-
-      for (const variant of product.variants) {
-        images = [...images, ...variant.images];
-      }
-
-      let inventory = [];
-
-      const inventoryRef = collection(db, 'inventory');
-
-      const qInv = query(inventoryRef, where('productId', '==', product.id));
-      const inventorySnapshot = await getDocs(qInv);
-
-      inventorySnapshot.forEach((doc) => {
-        inventory.push({ id: doc.id, ...doc.data() });
-      });
-
-      const currentInventoryLevels = [];
-
-      for (let i = 0; i < product.variants.length; i++) {
-        let variantInventory = {};
-        for (const item of product.variants[i].inventoryLevels) {
-          const skuInventoryLevel = inventory.find(
-            (sku) => sku.id === item.sku
-          );
-
-          const value = skuInventoryLevel.value;
-          const stock = skuInventoryLevel.stock;
-
-          variantInventory = { ...variantInventory, [value]: stock };
-          currentInventoryLevels.push({ ...item, ...skuInventoryLevel });
-        }
-
-        product.variants[i].inventory = variantInventory;
-        delete product.variants[i].inventoryLevels;
-      }
-
-      const sizesInput = {
-        s: false,
-        m: false,
-        l: false,
-        xl: false,
-        xxl: false,
-      };
-
-      const selectedSizes = Object.keys(product.variants[0].inventory);
-
-      for (const value of selectedSizes) {
-        sizesInput[value] = true;
-      }
-
-      product.images = images;
-      product.sizesInput = sizesInput;
-      product.sizes = selectedSizes;
-      product.currentInventoryLevels = currentInventoryLevels;
-      product.baseSku = currentInventoryLevels[0].id.split('-')[0];
-
       setIsLoading(false);
-
       return product;
     } catch (err) {
-      setError(err);
+      console.error(err);
+      setError(handleError(err));
       setIsLoading(false);
+      return null;
     }
   };
 
@@ -406,6 +432,8 @@ export const useAdmin = () => {
       const productRef = doc(db, 'products', product.id);
 
       await setDoc(productRef, product);
+
+      setIsLoading(false);
     } catch (err) {
       console.error(err);
       setError(err);
@@ -514,5 +542,7 @@ export const useAdmin = () => {
     getProduct,
     isLoading,
     error,
+    uploadProgress,
+    skuSizeCode,
   };
 };

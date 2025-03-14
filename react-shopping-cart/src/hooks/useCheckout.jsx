@@ -1,8 +1,7 @@
 import { useState } from 'react';
 
-import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
-
-import { db } from 'db/config';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../firebase/firebase-config';
 
 import { useCheckoutContext } from './useCheckoutContext';
 import { useAuthContext } from './useAuthContext';
@@ -40,7 +39,7 @@ export const useCheckout = () => {
         });
       }
 
-      await updateDoc(checkoutSessionRef, {
+      await setDoc(checkoutSessionRef, {
         email,
         shippingAddressId: formattedShippingAddress.id,
       });
@@ -79,7 +78,7 @@ export const useCheckout = () => {
     setError(null);
     setIsLoading(true);
     try {
-      await updateDoc(checkoutSessionRef, {
+      await setDoc(checkoutSessionRef, {
         shippingOption,
         shippingCost,
       });

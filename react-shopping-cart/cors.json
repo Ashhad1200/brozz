@@ -1,7 +1,8 @@
 [
     {
-      "origin": ["http://localhost:5173"],
-      "method": ["GET", "HEAD", "DELETE"],
-      "maxAgeSeconds": 3600
+      "origin": ["http://localhost:5174", "https://brozz-4c0b0.web.app", "https://brozz-4c0b0.firebaseapp.com"],
+      "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
+      "maxAgeSeconds": 3600,
+      "responseHeader": ["Content-Type", "Authorization", "Content-Length", "User-Agent", "x-goog-resumable"]
     }
   ]

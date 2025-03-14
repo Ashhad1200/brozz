@@ -6,7 +6,7 @@ import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 // import { db } from 'db/config';
 
 import ProductContext from './product-context';
-import { db } from '../../db/config';
+import { db } from '../../firebase/firebase-config';
 
 const initialState = {
   productIsReady: false,

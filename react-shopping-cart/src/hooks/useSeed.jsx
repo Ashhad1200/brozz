@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { collection, doc, writeBatch } from 'firebase/firestore';
 
-import { db } from 'db/config';
+import { db } from '../firebase/firebase-config';
 
 import moment from 'moment';
 

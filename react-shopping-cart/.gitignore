@@ -7,6 +7,10 @@
 firebase-config.jsx
 .firebase
 .firebaserc
+.env
+.env.local
+.env.development
+.env.production
 
 # data
 /src/data/products.json

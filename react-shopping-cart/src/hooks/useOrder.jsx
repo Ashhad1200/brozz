@@ -12,9 +12,10 @@ import {
   getDocs,
   addDoc,
   increment,
+  serverTimestamp
 } from 'firebase/firestore';
 
-import { db } from 'db/config';
+import { db } from '../firebase/firebase-config';
 
 import { useAuthContext } from './useAuthContext';
 import { useCartContext } from './useCartContext';
@@ -40,21 +41,28 @@ export const useOrder = () => {
   const createOrder = async (paymentInfo, billingAddress) => {
     setError(null);
     setIsLoading(true);
+    
+    const batch = writeBatch(db);
+    
     try {
-      const batch = writeBatch(db);
-
+      // Update inventory
       for (const item of items) {
         const skuRef = doc(
           collection(db, 'products', item.productId, 'skus'),
           item.skuId
         );
-        batch.update(skuRef, { quantity: increment(-item.quantity) });
+        batch.update(skuRef, { 
+          quantity: increment(-item.quantity),
+          lastUpdated: serverTimestamp()
+        });
       }
 
+      // Commit inventory updates
       await batch.commit();
 
-      await addDoc(ordersRef, {
-        createdAt: moment().toDate(),
+      // Create order
+      const orderData = {
+        createdAt: serverTimestamp(),
         items,
         email,
         shippingAddress,
@@ -63,25 +71,33 @@ export const useOrder = () => {
         paymentInfo,
         billingAddress,
         createdBy: user.uid,
-      });
+        status: 'pending',
+        total: items.reduce((sum, item) => sum + (item.price * item.quantity), 0) + shippingCost
+      };
 
-      await deleteCart();
-      await deleteCheckoutSession();
+      const orderRef = await addDoc(ordersRef, orderData);
+
+      // Clean up cart and checkout session
+      await Promise.all([
+        deleteCart(),
+        deleteCheckoutSession()
+      ]);
 
       setIsLoading(false);
+      return orderRef.id;
     } catch (err) {
       console.error(err);
       setError(handleError(err));
       setIsLoading(false);
+      return null;
     }
   };
 
   const getOrders = async () => {
     setError(null);
+    setIsLoading(true);
 
     try {
-      const orders = [];
-
       const q = query(
         ordersRef,
         where('createdBy', '==', user.uid),
@@ -89,14 +105,19 @@ export const useOrder = () => {
       );
 
       const querySnapshot = await getDocs(q);
-      querySnapshot.forEach((doc) => {
-        orders.push({ id: doc.id, ...doc.data() });
-      });
+      const orders = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate() || null
+      }));
 
+      setIsLoading(false);
       return orders;
     } catch (err) {
       console.error(err);
       setError(handleError(err));
+      setIsLoading(false);
+      return [];
     }
   };
 

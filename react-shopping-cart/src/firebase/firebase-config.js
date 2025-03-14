@@ -1,10 +1,27 @@
+import { initializeApp } from 'firebase/app';
+import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
-export const firebaseConfig = {
-  apiKey: "AIzaSyDPd5a4ivE-JGhDWMbtg0X2GW2BPZJki18",
-  authDomain: "brozz-4c0b0.firebaseapp.com",
-  projectId: "brozz-4c0b0",
-  storageBucket: "brozz-4c0b0.firebasestorage.app",
-  messagingSenderId: "1004055652845",
-  appId: "1:1004055652845:web:c8430814e48c7e782f1fe4",
-  measurementId: "G-1PQ8J5GB3B"
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+// Initialize Firebase services
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+// Set persistence to LOCAL
+setPersistence(auth, browserLocalPersistence);
+
+export { app, auth, db, storage, firebaseConfig };

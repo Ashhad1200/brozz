@@ -11,11 +11,24 @@ import styles from './index.module.scss';
 const LoginPage = () => {
   const { state: routerState } = useLocation();
 
-  const { login, isLoading, error, defaultValue } = useAuth();
+  const { login, signInWithGoogle, isLoading, error, defaultValue } = useAuth();
   const { sendToast } = useToast();
 
   const emailInput = useRef();
   const passwordInput = useRef();
+
+  const handleGoogleSignIn = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      sendToast({
+        error: true,
+        content: {
+          message: err.message || 'An error occurred during Google sign in. Please try again.'
+        }
+      });
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,7 +55,25 @@ const LoginPage = () => {
             <div className={styles.container}>
               <div className={`${styles.wrapper} main-container`}>
                 <form onSubmit={handleSubmit} className={styles.form}>
-                  <h2 className={styles.title}>Log into your account</h2>
+                  <h2 className={styles.title}>Login</h2>
+
+                  <button 
+                    type="button"
+                    className={styles.google_button}
+                    onClick={handleGoogleSignIn}
+                  >
+                    <img 
+                      src="/google-icon.svg" 
+                      alt="Google" 
+                      className={styles.google_icon}
+                    />
+                    Continue with Google
+                  </button>
+
+                  <div className={styles.divider}>
+                    <span>or</span>
+                  </div>
+
                   <label className={styles.label}>
                     <span>Email:</span>
                     <input
@@ -67,10 +98,10 @@ const LoginPage = () => {
                     Login
                   </button>
                 </form>
-                <p className={styles.no_account}>
-                  New to Flaakko?{' '}
+                <p className={styles.signup}>
+                  Don't have an account?{' '}
                   <Link to="/account/signup" state={routerState}>
-                    Create account
+                    Create Account
                   </Link>
                 </p>
               </div>

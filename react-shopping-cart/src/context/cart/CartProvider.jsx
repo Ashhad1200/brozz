@@ -2,7 +2,7 @@ import { useReducer, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 
 import { doc, getDoc, collection, setDoc, deleteDoc } from 'firebase/firestore';
-import { db } from 'db/config';
+import { db } from '../../firebase/firebase-config';
 
 import { useAuthContext } from 'hooks/useAuthContext';
 import { useToast } from 'hooks/useToast';

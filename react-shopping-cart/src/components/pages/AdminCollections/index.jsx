@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useCollection } from 'hooks/useCollection';
 import { useAdmin } from 'hooks/useAdmin';
 
-import { Loader, CenterModal, ConfirmModal } from 'components/common';
+import { Loader, CenterModal, ConfirmModal, ProductCard } from 'components/common';
 
 // import ProductCard from 'components/pages/collection/ProductCard';
 
@@ -13,21 +13,20 @@ const AdminCollections = () => {
   const { getCollection } = useCollection();
   const { deleteVariant, isLoading } = useAdmin();
 
-  const [variants, setVariants] = useState(null);
+  const [products, setProducts] = useState(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-
   const [productToBeDeleted, setProductToBeDeleted] = useState(null);
 
   useEffect(() => {
-    if (!variants) {
-      const fetchVariants = async () => {
-        const fetchedVariants = await getCollection();
-        setVariants(fetchedVariants);
+    if (!products) {
+      const fetchProducts = async () => {
+        const fetchedProducts = await getCollection();
+        setProducts(fetchedProducts);
       };
 
-      fetchVariants();
+      fetchProducts();
     }
-  }, [variants]);
+  }, [products]);
 
   const handleDeleteStart = ({ productId, variantId }) => {
     setProductToBeDeleted({ productId, variantId });
@@ -37,8 +36,7 @@ const AdminCollections = () => {
   const handleDeleteOnConfirm = async () => {
     setIsConfirmOpen(false);
     await deleteVariant(productToBeDeleted);
-
-    setVariants(null);
+    setProducts(null); // Refresh products list
   };
 
   const closeConfirm = () => {
@@ -64,30 +62,33 @@ const AdminCollections = () => {
           />
         )}
       </CenterModal>
-      {(!variants || isLoading) && <Loader />}
-      {variants && (
+      {(!products || isLoading) && <Loader />}
+      {products && (
         <section>
           <div className={`${styles.container} main-container`}>
             <h1>Admin Products/Variants</h1>
             <div className={styles.products_wrapper}>
-              {variants.map((variant) => (
-                <ProductCard
-                  key={variant.variantId}
-                  variantId={variant.variantId}
-                  productId={variant.productId}
-                  model={variant.model}
-                  color={variant.color}
-                  colorDisplay={variant.colorDisplay}
-                  currentPrice={variant.currentPrice}
-                  actualPrice={variant.actualPrice}
-                  type={variant.type}
-                  slug={variant.slug}
-                  imageTop={variant.images[0]}
-                  imageBottom={variant.images[1]}
-                  numberOfVariants={variant.numberOfVariants}
-                  handleDeleteStart={handleDeleteStart}
-                />
-              ))}
+              {products.map((product) => 
+                product.variants.map((variant) => (
+                  <ProductCard
+                    key={variant.id}
+                    variantId={variant.id}
+                    productId={product.id}
+                    model={product.model}
+                    color={variant.color}
+                    colorDisplay={variant.colorDisplay}
+                    currentPrice={variant.currentPrice}
+                    actualPrice={variant.actualPrice}
+                    type={product.type}
+                    slug={variant.slug}
+                    imageTop={variant.images[0]}
+                    imageBottom={variant.images[1]}
+                    numberOfVariants={product.variants.length}
+                    handleDeleteStart={handleDeleteStart}
+                    isAdmin={true}
+                  />
+                ))
+              )}
             </div>
           </div>
         </section>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 
-import { db } from 'db/config';
+import { db } from '../firebase/firebase-config';
 
 import { handleError } from 'helpers/error/handleError';
 
