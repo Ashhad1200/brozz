@@ -2,13 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FaRedoAlt } from 'react-icons/fa';
 
-import { useCollection } from 'hooks/useCollection';
+// import { useCollection } from 'hooks/useCollection';
 
 import ProductFilter from './ProductFilter';
 
 import { ProductCard, Loader } from 'components/common';
 
 import styles from './index.module.scss';
+import { useCollection } from '../../../hooks/useCollection';
 
 const validSlugs = [
   'products',

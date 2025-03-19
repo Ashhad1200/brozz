@@ -1,52 +1,32 @@
 import { useState, useEffect } from 'react';
-
-import { useCollection } from 'hooks/useCollection';
-
-import { ProductSlider } from 'components/common';
-
 import styles from './index.module.scss';
+import { ProductSlider } from '../../../common';
+import { useCollection } from '../../../../hooks/useCollection';
 
 const ProductSliderSection = ({ titleTop, titleBottom, sortBy }) => {
   const { getCollection } = useCollection();
-
-  const [slides, setSlides] = useState([
-    { id: 1 },
-    { id: 2 },
-    { id: 3 },
-    { id: 4 },
-    { id: 5 },
-    { id: 6 },
-    { id: 7 },
-    { id: 8 },
-    { id: 9 },
-    { id: 10 },
-    { id: 11 },
-    { id: 12 },
-    { id: 13 },
-    { id: 14 },
-    { id: 15 },
-  ]);
-
+  const [slides, setSlides] = useState([]);
+  console.log('ProductSliderSection', slides);
   useEffect(() => {
-    (async () => {
-      const fetchedVariants = await getCollection({
-        sortBy,
-      });
+    const fetchData = async () => {
+      try {
+        const fetchedVariants = await getCollection({ sortBy });
 
-      // Check if fetchedVariants is defined before sorting
-      if (fetchedVariants) {
-        setSlides(
-          fetchedVariants.sort((a, b) => {
-            const colorA = a.color || '';
-            const colorB = b.color || '';
-            return colorA.toUpperCase() > colorB.toUpperCase() ? 1 : -1;
-          })
-        );
-      } else {
-        setSlides([]); // set empty array if data is not available.
+        if (Array.isArray(fetchedVariants)) {
+          setSlides(
+            fetchedVariants.sort((a, b) => (a.color || '').localeCompare(b.color || ''))
+          );
+        } else {
+          setSlides([]);
+        }
+      } catch (error) {
+        console.error("Error fetching collection:", error);
+        setSlides([]);
       }
-    })();
-  }, []);
+    };
+
+    fetchData();
+  }, [sortBy, getCollection]);
 
   return (
     <section className={styles.section}>
