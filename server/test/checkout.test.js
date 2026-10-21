@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 
 before(h.resetDb);
-after(() => h.pool.end());
+after(() => h.prisma.$disconnect());
 
 test('first address becomes main; a new main address moves to the top', async () => {
   const { token } = await h.signup();
@@ -102,8 +102,8 @@ test('placing an order snapshots the cart, charges server-side shipping and decr
   assert.equal(orders.body.orders[0].id, order.id);
 
   // The card number and CVV are never persisted.
-  const { rows } = await h.query('SELECT payment_info::text AS p FROM orders WHERE id = $1', [order.id]);
-  assert.doesNotMatch(rows[0].p, /4242 4242|123"/);
+  const stored = await h.prisma.order.findUnique({ where: { id: order.id } });
+  assert.doesNotMatch(JSON.stringify(stored.paymentInfo), /4242 4242|123"/);
 });
 
 test('rejects invalid or expired cards without touching stock', async () => {
@@ -133,6 +133,26 @@ test('an order that would oversell is refused and the cart is trimmed', async ()
   assert.equal(await h.getStock(sku.skuId), 1);
 
   await h.setStock(sku.skuId, original);
+});
+
+test('two shoppers racing for the last unit: exactly one order succeeds', async () => {
+  const first = await prepareCheckout('standard');
+  const second = await prepareCheckout('standard');
+  // Both carts hold 2 of the same SKU; leave stock for just one of them.
+  assert.equal(first.sku.skuId, second.sku.skuId);
+  const original = await h.getStock(first.sku.skuId);
+  await h.setStock(first.sku.skuId, 2);
+
+  const results = await Promise.all(
+    [first, second].map(({ token }) =>
+      h.api().post('/api/orders').set(h.auth(token)).send({ payment: h.VALID_CARD })
+    )
+  );
+
+  assert.deepEqual(results.map((r) => r.status).sort(), [201, 409]);
+  assert.equal(await h.getStock(first.sku.skuId), 0);
+
+  await h.setStock(first.sku.skuId, original);
 });
 
 test('checkout requires an account, an address and a shipping option', async () => {

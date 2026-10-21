@@ -1,8 +1,9 @@
 const jwt = require('jsonwebtoken');
 
 const config = require('../config');
-const { query } = require('../db/pool');
+const { prisma } = require('../db/prisma');
 const { unauthorized, forbidden } = require('../lib/errors');
+const { isUuid } = require('../lib/validate');
 
 const signToken = (userId) =>
   jwt.sign({ sub: userId }, config.jwtSecret, {
@@ -27,10 +28,8 @@ const loadUser = async (req) => {
     return null;
   }
 
-  const { rows } = await query('SELECT * FROM users WHERE id = $1', [
-    payload.sub,
-  ]);
-  return rows[0] || null;
+  if (!isUuid(payload.sub)) return null;
+  return prisma.user.findUnique({ where: { id: payload.sub } });
 };
 
 // Any session, guest or registered.
@@ -48,7 +47,7 @@ const requireAuth = async (req, res, next) => {
 const requireAccount = (req, res, next) =>
   requireAuth(req, res, (err) => {
     if (err) return next(err);
-    if (req.user.is_anonymous) {
+    if (req.user.isAnonymous) {
       return next(unauthorized('Please log in to continue'));
     }
     next();
@@ -57,7 +56,7 @@ const requireAccount = (req, res, next) =>
 const requireAdmin = (req, res, next) =>
   requireAccount(req, res, (err) => {
     if (err) return next(err);
-    if (!req.user.is_admin) return next(forbidden());
+    if (!req.user.isAdmin) return next(forbidden());
     next();
   });
 

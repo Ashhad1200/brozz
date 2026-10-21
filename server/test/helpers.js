@@ -1,12 +1,13 @@
 process.env.NODE_ENV = 'test';
 
+const { execSync } = require('child_process');
 const fs = require('fs/promises');
+const path = require('path');
 const bcrypt = require('bcryptjs');
 const request = require('supertest');
 
 const config = require('../src/config');
-const { pool, query } = require('../src/db/pool');
-const { migrate } = require('../src/db/migrate');
+const { prisma } = require('../src/db/prisma');
 const { seedProducts } = require('../src/db/seed');
 const { createApp } = require('../src/app');
 
@@ -15,10 +16,16 @@ const api = () => request(app);
 
 const PASSWORD = 'Secret123!';
 
-// Wipes the test database and re-seeds the demo catalog.
+// Rebuilds the test database from the Prisma migrations, then seeds the demo
+// catalog. Runs before each test file; TEST_DATABASE_URL is wiped every time.
 const resetDb = async () => {
-  await query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
-  await migrate();
+  await prisma.$executeRawUnsafe('DROP SCHEMA IF EXISTS public CASCADE');
+  await prisma.$executeRawUnsafe('CREATE SCHEMA public');
+  execSync('npx prisma migrate deploy', {
+    cwd: path.join(__dirname, '..'),
+    env: { ...process.env, DATABASE_URL: config.databaseUrl },
+    stdio: 'pipe',
+  });
   await fs.rm(config.uploadDir, { recursive: true, force: true });
   await seedProducts();
 };
@@ -47,11 +54,15 @@ const signup = async (token, overrides = {}) => {
 
 const createAdmin = async () => {
   const email = `admin-${Date.now()}-${counter++}@example.com`;
-  await query(
-    `INSERT INTO users (email, password_hash, name, last_name, is_admin)
-     VALUES ($1, $2, 'Ada', 'Admin', TRUE)`,
-    [email, await bcrypt.hash(PASSWORD, 4)]
-  );
+  await prisma.user.create({
+    data: {
+      email,
+      passwordHash: await bcrypt.hash(PASSWORD, 4),
+      name: 'Ada',
+      lastName: 'Admin',
+      isAdmin: true,
+    },
+  });
   const res = await api()
     .post('/api/auth/login')
     .send({ email, password: PASSWORD })
@@ -72,11 +83,10 @@ const findSku = async (predicate = (sku) => sku.quantity > 0) => {
 };
 
 const setStock = (skuId, quantity) =>
-  query('UPDATE skus SET quantity = $2 WHERE id = $1', [skuId, quantity]);
+  prisma.sku.update({ where: { id: skuId }, data: { quantity } });
 
 const getStock = async (skuId) =>
-  (await query('SELECT quantity FROM skus WHERE id = $1', [skuId])).rows[0]
-    .quantity;
+  (await prisma.sku.findUnique({ where: { id: skuId } })).quantity;
 
 const addAddress = async (token, overrides = {}) => {
   const res = await api()
@@ -106,8 +116,7 @@ const VALID_CARD = {
 module.exports = {
   api,
   auth,
-  pool,
-  query,
+  prisma,
   resetDb,
   guest,
   signup,

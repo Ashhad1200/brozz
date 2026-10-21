@@ -1,6 +1,6 @@
 const express = require('express');
 
-const { query } = require('../db/pool');
+const { prisma } = require('../db/prisma');
 const { asyncHandler } = require('../lib/errors');
 const { cleanEmail } = require('../lib/validate');
 
@@ -10,14 +10,13 @@ router.post(
   '/',
   asyncHandler(async (req, res) => {
     const email = cleanEmail(req.body.email);
-    const { rowCount } = await query(
-      `INSERT INTO newsletter_subscribers (email) VALUES ($1)
-       ON CONFLICT (email) DO NOTHING`,
-      [email]
-    );
+    const { count: created } = await prisma.newsletterSubscriber.createMany({
+      data: [{ email }],
+      skipDuplicates: true,
+    });
     res
-      .status(rowCount ? 201 : 200)
-      .json({ message: rowCount ? 'Thanks for joining!' : 'You have already joined!' });
+      .status(created ? 201 : 200)
+      .json({ message: created ? 'Thanks for joining!' : 'You have already joined!' });
   })
 );
 

@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 
 before(h.resetDb);
-after(() => h.pool.end());
+after(() => h.prisma.$disconnect());
 
 const add = (token, skuId) =>
   h.api().post('/api/cart/items').set(h.auth(token)).send({ skuId });

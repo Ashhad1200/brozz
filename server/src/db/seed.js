@@ -2,8 +2,7 @@ const fs = require('fs/promises');
 const path = require('path');
 
 const config = require('../config');
-const { pool, query } = require('./pool');
-const { migrate } = require('./migrate');
+const { prisma } = require('./prisma');
 const { saveProduct } = require('../services/adminProducts');
 
 const SEED_IMAGE_DIR = path.join(__dirname, '..', '..', 'seed-images');
@@ -144,8 +143,7 @@ const PRODUCTS = [
 // Copies seed images into the upload directory and inserts the demo catalog.
 // Does nothing if the catalog already has products.
 const seedProducts = async () => {
-  const { rows } = await query('SELECT COUNT(*)::int AS count FROM products');
-  if (rows[0].count > 0) {
+  if ((await prisma.product.count()) > 0) {
     return { seeded: 0, message: 'Catalog already has products; nothing seeded.' };
   }
 
@@ -166,11 +164,10 @@ const seedProducts = async () => {
 };
 
 if (require.main === module) {
-  migrate()
-    .then(seedProducts)
+  seedProducts()
     .then(({ message }) => {
       console.log(message);
-      return pool.end();
+      return prisma.$disconnect();
     })
     .catch((err) => {
       console.error('Seeding failed:', err);

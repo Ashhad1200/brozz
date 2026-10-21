@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 
 before(h.resetDb);
-after(() => h.pool.end());
+after(() => h.prisma.$disconnect());
 
 test('guest session can read /me and is not verified', async () => {
   const token = await h.guest();
@@ -62,8 +62,8 @@ test('login checks the password and never stores it in plain text', async () => 
   assert.ok(ok.body.token);
   assert.equal(ok.body.user.email, 'login@example.com');
 
-  const { rows } = await h.query("SELECT password_hash FROM users WHERE email = 'login@example.com'");
-  assert.notEqual(rows[0].password_hash, h.PASSWORD);
+  const stored = await h.prisma.user.findUnique({ where: { email: 'login@example.com' } });
+  assert.notEqual(stored.passwordHash, h.PASSWORD);
 });
 
 test('login merges the guest cart into the account and removes the guest', async () => {

@@ -1,4 +1,4 @@
-const { query } = require('../db/pool');
+const { prisma, toNumber } = require('../db/prisma');
 const { colorSlug } = require('../lib/slug');
 
 const discountPercent = (price, actualPrice) => {
@@ -6,40 +6,24 @@ const discountPercent = (price, actualPrice) => {
   return Math.round(((1 - price / actualPrice) * 100) / 5) * 5;
 };
 
+// Products with their variants and SKUs, in display order.
+const PRODUCT_INCLUDE = {
+  variants: {
+    orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+    include: { skus: { orderBy: { position: 'asc' } } },
+  },
+};
+
 // Loads products with their variants and SKUs, keyed by product id.
-const loadProducts = async (productIds, client = { query }) => {
+const loadProducts = async (productIds, db = prisma) => {
   if (productIds.length === 0) return new Map();
 
-  const [{ rows: products }, { rows: variants }, { rows: skus }] =
-    await Promise.all([
-      client.query('SELECT * FROM products WHERE id = ANY($1::uuid[])', [
-        productIds,
-      ]),
-      client.query(
-        'SELECT * FROM variants WHERE product_id = ANY($1::uuid[]) ORDER BY position, created_at',
-        [productIds]
-      ),
-      client.query(
-        'SELECT * FROM skus WHERE product_id = ANY($1::uuid[]) ORDER BY position',
-        [productIds]
-      ),
-    ]);
+  const products = await db.product.findMany({
+    where: { id: { in: productIds } },
+    include: PRODUCT_INCLUDE,
+  });
 
-  const byId = new Map(
-    products.map((product) => [product.id, { ...product, variants: [] }])
-  );
-  const variantsById = new Map();
-
-  for (const variant of variants) {
-    const withSkus = { ...variant, skus: [] };
-    variantsById.set(variant.id, withSkus);
-    byId.get(variant.product_id).variants.push(withSkus);
-  }
-  for (const sku of skus) {
-    variantsById.get(sku.variant_id)?.skus.push(sku);
-  }
-
-  return byId;
+  return new Map(products.map((product) => [product.id, product]));
 };
 
 const variantUrl = (product, variant) =>
@@ -62,12 +46,14 @@ const toCardSkus = (variant) =>
 
 const variantSummary = (product, variant) => {
   const skus = toCardSkus(variant);
+  const price = toNumber(variant.price);
+  const actualPrice = toNumber(variant.actualPrice);
   return {
     variantId: variant.id,
     color: variant.color,
-    price: variant.price,
-    actualPrice: variant.actual_price,
-    discount: discountPercent(variant.price, variant.actual_price),
+    price,
+    actualPrice,
+    discount: discountPercent(price, actualPrice),
     slides: toSlides(product, variant),
     skus,
     isSoldOut: skus.every((sku) => sku.quantity <= 0),
@@ -95,13 +81,8 @@ const toVariantCard = (product, variant) => {
     availableQuantity,
     numberOfVariants: product.variants.length,
     allVariants: product.variants.map((v) => variantSummary(product, v)),
-    createdAt: product.created_at,
+    createdAt: product.createdAt,
   };
-};
-
-const SORT_COLUMNS = {
-  createdAt: 'p.created_at',
-  price: 'v.price',
 };
 
 const listVariantCards = async ({
@@ -111,36 +92,32 @@ const listVariantCards = async ({
   offset = 0,
   limit = 12,
 }) => {
-  const sortColumn = SORT_COLUMNS[sortField] || SORT_COLUMNS.createdAt;
-  const sortDirection = direction === 'desc' ? 'DESC' : 'ASC';
+  const where = collection ? { product: { collection } } : {};
+  const dir = direction === 'desc' ? 'desc' : 'asc';
+  const primarySort =
+    sortField === 'price' ? { price: dir } : { product: { createdAt: dir } };
 
-  const { rows: countRows } = await query(
-    `SELECT COUNT(*)::int AS total
-       FROM variants v JOIN products p ON p.id = v.product_id
-      WHERE ($1::text IS NULL OR p.collection = $1)`,
-    [collection]
-  );
-
-  const { rows: page } = await query(
-    `SELECT v.id, v.product_id
-       FROM variants v JOIN products p ON p.id = v.product_id
-      WHERE ($1::text IS NULL OR p.collection = $1)
-      ORDER BY ${sortColumn} ${sortDirection}, v.position, v.id
-      LIMIT $2 OFFSET $3`,
-    [collection, limit, offset]
-  );
+  const [total, page] = await Promise.all([
+    prisma.variant.count({ where }),
+    prisma.variant.findMany({
+      where,
+      orderBy: [primarySort, { position: 'asc' }, { id: 'asc' }],
+      skip: offset,
+      take: limit,
+      select: { id: true, productId: true },
+    }),
+  ]);
 
   const products = await loadProducts([
-    ...new Set(page.map((row) => row.product_id)),
+    ...new Set(page.map((row) => row.productId)),
   ]);
 
   const items = page.map((row) => {
-    const product = products.get(row.product_id);
+    const product = products.get(row.productId);
     const variant = product.variants.find((v) => v.id === row.id);
     return toVariantCard(product, variant);
   });
 
-  const total = countRows[0].total;
   return { items, total, hasMore: offset + items.length < total };
 };
 
@@ -157,10 +134,10 @@ const toProductDetail = (product) => ({
   variants: product.variants.map((variant) => ({
     variantId: variant.id,
     color: variant.color,
-    colorDisplay: variant.color_display,
+    colorDisplay: variant.colorDisplay,
     colorSlug: colorSlug(variant.color),
-    variantPrice: variant.price,
-    actualPrice: variant.actual_price,
+    variantPrice: toNumber(variant.price),
+    actualPrice: toNumber(variant.actualPrice),
     images: variant.images,
     sizes: variant.skus.map((sku) => ({
       skuId: sku.id,
@@ -175,19 +152,17 @@ const getProductBySlug = async (fullSlug) => {
   const lastDash = fullSlug.lastIndexOf('-');
   if (lastDash <= 0) return null;
 
-  const productSlug = fullSlug.slice(0, lastDash);
+  const product = await prisma.product.findUnique({
+    where: { slug: fullSlug.slice(0, lastDash) },
+    include: PRODUCT_INCLUDE,
+  });
+  if (!product) return null;
+
+  const detail = toProductDetail(product);
   const color = fullSlug.slice(lastDash + 1);
+  const variant = detail.variants.find((v) => v.colorSlug === color);
 
-  const { rows } = await query('SELECT id FROM products WHERE slug = $1', [
-    productSlug,
-  ]);
-  if (rows.length === 0) return null;
-
-  const products = await loadProducts([rows[0].id]);
-  const product = toProductDetail(products.get(rows[0].id));
-  const variant = product.variants.find((v) => v.colorSlug === color);
-
-  return variant ? { product, variantId: variant.variantId } : null;
+  return variant ? { product: detail, variantId: variant.variantId } : null;
 };
 
 module.exports = {
