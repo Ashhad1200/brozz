@@ -94,7 +94,7 @@ const PRODUCTS = [
   },
   {
     product: {
-      model: 'flaakko',
+      model: 'hangies',
       type: 'buzo',
       collection: 'hoodies-sweatshirts',
       description: 'Crewneck sweatshirt with an embroidered logo.',
@@ -109,8 +109,8 @@ const PRODUCTS = [
         actualPrice: 40,
         inventory: stock(7),
         images: [
-          image('productos-buzo-flaakko-negro-1.jpg'),
-          image('productos-buzo-flaakko-negro-2.jpg'),
+          image('productos-buzo-hangies-negro-1.jpg'),
+          image('productos-buzo-hangies-negro-2.jpg'),
         ],
       },
     ],
