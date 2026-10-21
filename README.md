@@ -1,4 +1,4 @@
-# Brozz shop
+# Hangies
 
 A clothing store: a React storefront with an admin area, backed by an Express API
 and PostgreSQL.

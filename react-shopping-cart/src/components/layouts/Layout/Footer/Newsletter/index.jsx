@@ -40,7 +40,7 @@ const Newsletter = () => {
     <>
       <section className={styles.section}>
         <div className={styles.container}>
-          <h3 className={styles.title}>Sign up for the FLAAKKO newsletter</h3>
+          <h3 className={styles.title}>Sign up for the HANGIES newsletter</h3>
           <form
             className={styles.form}
             onSubmit={handleSubmit}
