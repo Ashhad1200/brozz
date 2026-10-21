@@ -10,12 +10,16 @@ import styles from './index.module.scss';
 
 const CenterModal = ({
   children,
-  close,
+  close: closeProp,
+  toggleModal,
   backdropClassName,
   containerClassName,
   wrapperClassName,
   modalClassName,
 }) => {
+  // Callers pass either `close` or `toggleModal`.
+  const close = closeProp || toggleModal || (() => {});
+
   useKeyDown(() => {
     close();
   }, ['Escape']);

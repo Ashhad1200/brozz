@@ -3,8 +3,6 @@ import Order from './Order';
 import styles from './index.module.scss';
 
 const AccountOrders = ({ orders }) => {
-  // TODO: handle credit card number fetch
-
   return (
     <div className={styles.orders_wrapper}>
       {orders.length === 0 && (
@@ -25,7 +23,7 @@ const AccountOrders = ({ orders }) => {
                 city={order.shippingAddress.city}
                 state={order.shippingAddress.state}
                 zipCode={order.shippingAddress.zipCode}
-                payment="**** **** **** ****"
+                payment={`**** **** **** ${order.paymentInfo?.last4 || '****'}`}
                 shippingOption={order.shippingOption}
                 shippingCost={order.shippingCost}
               />

@@ -42,6 +42,7 @@ const ProductCard = ({
     variantId,
     color,
     currentPrice,
+    actualPrice,
     discount,
     slides,
     skus,
@@ -80,6 +81,7 @@ const ProductCard = ({
       variantId,
       color: selectedVariant.color,
       currentPrice: selectedVariant.price,
+      actualPrice: selectedVariant.actualPrice,
       discount: selectedVariant.discount,
       slides: selectedVariant.slides,
       skus: selectedVariant.skus,
@@ -124,7 +126,7 @@ const ProductCard = ({
             {currentVariant.isSoldOut && (
               <span className={styles.sold_out}>Sold Out</span>
             )}
-            {currentVariant.currentPrice < actualPrice && (
+            {currentVariant.currentPrice < currentVariant.actualPrice && (
               <span className={styles.discount}>
                 -{currentVariant.discount}%
               </span>
@@ -244,13 +246,13 @@ const ProductCard = ({
                   )}
                 </li>
                 <li className={styles.price}>
-                  {currentVariant.currentPrice < actualPrice ? (
+                  {currentVariant.currentPrice < currentVariant.actualPrice ? (
                     <>
                       <span className={styles.discounted_price}>
                         ${formatPrice(currentVariant.currentPrice)}
                       </span>
                       <span className={styles.crossed_price}>
-                        ${formatPrice(actualPrice)}
+                        ${formatPrice(currentVariant.actualPrice)}
                       </span>
                     </>
                   ) : (

@@ -1,23 +1,11 @@
+import { ApiError } from '../../api/client';
 import { CustomError } from './customError';
 
 export const handleError = (err) => {
-  if (err instanceof CustomError) {
+  if (err instanceof CustomError || err instanceof ApiError) {
     return { message: err.message };
-  } else if (
-    err?.code === 'auth/wrong-password' ||
-    err?.code === 'auth/user-not-found'
-  ) {
-    return {
-      message: 'User/password is incorrect!',
-    };
-  } else if (err.code === 'auth/email-already-in-use') {
-    return {
-      message: 'User already exists!',
-    };
-  } else {
-    return {
-      message:
-        'An unexpected error occurred. Please contact juanquintana1996@gmail.com.',
-    };
   }
+  return {
+    message: 'An unexpected error occurred. Please try again later.',
+  };
 };

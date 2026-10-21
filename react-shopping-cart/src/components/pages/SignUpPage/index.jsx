@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 import { useAuth } from 'hooks/useAuth';
 import { useToast } from 'hooks/useToast';
@@ -28,9 +28,8 @@ const passwordSuggestions = [
 
 const SignUpPage = () => {
   const { state: routerState } = useLocation();
-  const navigate = useNavigate();
 
-  const { signUp, signInWithGoogle, isLoading, error, defaultValue } = useAuth();
+  const { signUp, isLoading, error, defaultValue } = useAuth();
   const { sendToast } = useToast();
 
   const nameInput = useRef();
@@ -75,18 +74,6 @@ const SignUpPage = () => {
     setShowPassword(!showPassword);
   };
 
-  const handleGoogleSignUp = async () => {
-    try {
-      await signInWithGoogle();
-    } catch (err) {
-      sendToast({
-        error: true,
-        content: {
-          message: err.message || 'An error occurred during Google sign up. Please try again.'
-        }
-      });
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -103,48 +90,17 @@ const SignUpPage = () => {
       return;
     }
 
-    try {
-      await signUp({
-        name: nameInput.current.value,
-        lastName: lastNameInput.current.value,
-        email: emailInput.current.value,
-        password: passwordInput.current.value,
-      });
-    } catch (err) {
-      // Handle specific Firebase errors
-      if (err.code === 'auth/provider-already-linked' || err.code === 'auth/email-already-in-use') {
-        sendToast({
-          error: true,
-          content: {
-            message: 'This email is already registered. Please try logging in instead.',
-            action: {
-              label: 'Go to Login',
-              onClick: () => navigate('/account/login', { state: routerState })
-            }
-          }
-        });
-        // Safely focus the email input if it exists
-        if (emailInput.current) {
-          emailInput.current.focus();
-        }
-      } else {
-        // Handle other errors
-        sendToast({
-          error: true,
-          content: {
-            message: err.message || 'An error occurred during sign up. Please try again.'
-          }
-        });
-      }
-    }
+    await signUp({
+      name: nameInput.current.value,
+      lastName: lastNameInput.current.value,
+      email: emailInput.current.value,
+      password: passwordInput.current.value,
+    });
   };
 
   useEffect(() => {
     if (error) {
-      // Only show general errors here, specific errors are handled in handleSubmit
-      if (error.code !== 'auth/provider-already-linked' && error.code !== 'auth/email-already-in-use') {
-        sendToast({ error: true, content: { message: error.message } });
-      }
+      sendToast({ error: true, content: { message: error.message } });
     }
   }, [error]);
 
@@ -159,23 +115,6 @@ const SignUpPage = () => {
               <div className={`${styles.wrapper} main-container`}>
                 <form onSubmit={handleSubmit} className={styles.form}>
                   <h2 className={styles.title}>Create Account</h2>
-                  
-                  <button 
-                    type="button"
-                    className={styles.google_button}
-                    onClick={handleGoogleSignUp}
-                  >
-                    <img 
-                      src="/google-icon.svg" 
-                      alt="Google" 
-                      className={styles.google_icon}
-                    />
-                    Continue with Google
-                  </button>
-
-                  <div className={styles.divider}>
-                    <span>or</span>
-                  </div>
 
                   <label className={styles.label}>
                     <span>Name:</span>

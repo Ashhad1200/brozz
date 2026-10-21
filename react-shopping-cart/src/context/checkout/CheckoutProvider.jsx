@@ -1,11 +1,10 @@
 import { useReducer, useEffect } from 'react';
 
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { db } from '../../firebase/firebase-config';
-
 import { useAuthContext } from 'hooks/useAuthContext';
 
 import CheckoutContext from './checkout-context';
+
+import { api } from '../../api/client';
 
 const initialState = {
   checkoutIsReady: false,
@@ -53,14 +52,6 @@ const checkoutReducer = (state, action) => {
         currentStep: state.currentStep + 1,
       };
     }
-    case 'CREATE_CHECKOUT_SESSION': {
-      return {
-        ...state,
-        checkoutIsReady: true,
-        id: payload.id,
-        email: payload.email,
-      };
-    }
     case 'UPDATE_CHECKOUT_SESSION': {
       return {
         ...state,
@@ -80,48 +71,25 @@ const checkoutReducer = (state, action) => {
 };
 
 const CheckoutProvider = ({ children }) => {
-  const { email, user } = useAuthContext();
+  const { user } = useAuthContext();
 
   const [state, dispatch] = useReducer(checkoutReducer, initialState);
 
   useEffect(() => {
     const getCheckoutSession = async () => {
-      const checkoutSessionRef = doc(db, 'checkoutSessions', user.uid);
-
-      const checkoutSessionDoc = await getDoc(checkoutSessionRef);
-
-      if (checkoutSessionDoc.exists()) {
-        const checkoutSessionData = checkoutSessionDoc.data();
-
-        const { shippingAddressId, ...formattedCheckoutData } =
-          checkoutSessionData;
-
-        formattedCheckoutData.shippingAddress = { id: shippingAddressId };
-
+      try {
+        const session = await api('/checkout');
         dispatch({
           type: 'UPDATE_CHECKOUT_SESSION',
-          payload: { ...formattedCheckoutData, id: user.uid },
+          payload: { ...session, id: user.id },
         });
-      } else {
-        await setDoc(checkoutSessionRef, {
-          email,
-          shippingAddressId: null,
-          shippingOption: { standard: false, expedited: false },
-          paymentInfo: {},
-          shippingCost: 0,
-        });
-
-        dispatch({
-          type: 'CREATE_CHECKOUT_SESSION',
-          payload: { id: user.uid, email },
-        });
+      } catch (err) {
+        console.error(err);
       }
     };
 
     getCheckoutSession();
   }, []);
-
-  console.log('checkout-context', state);
 
   return (
     <CheckoutContext.Provider value={{ ...state, dispatch }}>

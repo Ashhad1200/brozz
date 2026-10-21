@@ -132,19 +132,12 @@ const VariantForm = ({
 
   return (
     <>
-      <CenterModal
-        toggleModal={closeConfirm}
-        modalClassName={styles.confirm_modal}
-      >
-        {isConfirmOpen && (
-          <ConfirmModal
-            isConfirmOpen={isConfirmOpen}
-            handleConfirm={handleDeleteOnConfirm}
-            handleCancel={closeConfirm}
-            text="Are you sure you want to delete this variant?"
-          />
-        )}
-      </CenterModal>
+      <ConfirmModal
+        show={isConfirmOpen}
+        close={closeConfirm}
+        handleConfirm={handleDeleteOnConfirm}
+        text="Are you sure you want to delete this variant?"
+      />
       <CenterModal
         modalClassName={styles.modal}
         toggleModal={closeImageSelector}

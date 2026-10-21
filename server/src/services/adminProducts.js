@@ -3,7 +3,7 @@ const path = require('path');
 
 const config = require('../config');
 const { query, withTransaction } = require('../db/pool');
-const { badRequest, notFound } = require('../lib/errors');
+const { badRequest, notFound, conflict } = require('../lib/errors');
 const {
   cleanString,
   isUuid,
@@ -186,6 +186,17 @@ const syncVariants = async (client, productId, input) => {
     for (const [sizePosition, size] of input.sizes.entries()) {
       const code = skuCode(input.baseSku, variant.color, size);
       const quantity = variant.inventory[size];
+
+      const { rows: taken } = await client.query(
+        'SELECT 1 FROM skus WHERE sku = $1 AND NOT (variant_id = $2 AND size = $3)',
+        [code, variantId, size]
+      );
+      if (taken.length > 0) {
+        throw conflict(
+          `SKU ${code} is already used by another product. Choose a different base SKU.`
+        );
+      }
+
       const { rowCount } = await client.query(
         `UPDATE skus SET sku = $3, quantity = $4, position = $5, updated_at = NOW()
           WHERE variant_id = $1 AND size = $2`,

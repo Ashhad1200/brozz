@@ -130,6 +130,19 @@ test('deleting the last variant deletes the product and its unused uploads', asy
   assert.equal(fs.existsSync(file), false);
 });
 
+test('a SKU clash with another product is reported clearly', async () => {
+  const token = await h.createAdmin();
+  const images = await upload(token);
+  await h.api().post('/api/admin/products').set(h.auth(token))
+    .send(productBody(images, { model: 'First', sku: 'dup' }))
+    .expect(201);
+
+  const res = await h.api().post('/api/admin/products').set(h.auth(token))
+    .send(productBody(images, { model: 'Second', sku: 'dup' }))
+    .expect(409);
+  assert.match(res.body.message, /SKU DUP-LBL-SM is already used/);
+});
+
 test('rejects non-image uploads', async () => {
   const token = await h.createAdmin();
   await h.api().post('/api/admin/uploads').set(h.auth(token))

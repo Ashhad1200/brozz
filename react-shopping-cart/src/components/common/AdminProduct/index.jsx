@@ -5,11 +5,12 @@ import { useNavigate } from 'react-router-dom';
 import { v4 as uuid } from 'uuid';
 
 import { useAdmin } from 'hooks/useAdmin';
+import { useToast } from 'hooks/useToast';
 
 import ProductForm from './ProductForm';
 import Variants from './Variants';
 
-import { Button, Loader, CenterModal, ConfirmModal } from 'components/common';
+import { Button, Loader, ConfirmModal } from 'components/common';
 
 import styles from './index.module.scss';
 
@@ -30,6 +31,7 @@ const AdminProduct = ({
 }) => {
   const navigate = useNavigate();
   const [navigation, setNavigation] = useState(false);
+  const { sendToast } = useToast();
 
   const {
     uploadFiles,
@@ -112,7 +114,9 @@ const AdminProduct = ({
     const updatedVariants = [...variants];
 
     for (const variant of updatedVariants) {
-      variant.images = variant.images.filter((image) => image !== fileName);
+      variant.images = variant.images.filter(
+        (image) => image.name !== fileName
+      );
     }
 
     setImages(updatedImages);
@@ -254,6 +258,12 @@ const AdminProduct = ({
     }
   }, [navigation]);
 
+  useEffect(() => {
+    if (error) {
+      sendToast({ error: true, content: { message: error.message } });
+    }
+  }, [error]);
+
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const handleDeleteOnConfirm = async () => {
@@ -287,17 +297,12 @@ const AdminProduct = ({
 
   return (
     <>
-      <CenterModal
-        toggleModal={closeConfirm}
-        modalClassName={styles.confirm_modal}
-      >
-        {isConfirmOpen && (
-          <ConfirmModal
-            text="Are you sure you want to delete this product? There is no way to undo this."
-            handleConfirm={handleDeleteOnConfirm}
-          />
-        )}
-      </CenterModal>
+      <ConfirmModal
+        show={isConfirmOpen}
+        close={closeConfirm}
+        text="Are you sure you want to delete this product? There is no way to undo this."
+        handleConfirm={handleDeleteOnConfirm}
+      />
       {isLoading && <Loader />}
       <section>
         <div className={`${styles.container} main-container`}>

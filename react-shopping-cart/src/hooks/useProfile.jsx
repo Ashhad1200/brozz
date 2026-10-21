@@ -1,17 +1,12 @@
 import { useState } from 'react';
 
-import { doc, updateDoc } from 'firebase/firestore';
-
-import { db } from '../firebase/firebase-config';
-
 import { useAuthContext } from './useAuthContext';
 
 import { handleError } from 'helpers/error/handleError';
+import { api } from '../api/client';
 
 export const useProfile = () => {
-  const { user, dispatch } = useAuthContext();
-
-  const userRef = doc(db, 'users', user.uid);
+  const { dispatch } = useAuthContext();
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -20,21 +15,23 @@ export const useProfile = () => {
     setError(null);
     setIsLoading(true);
     try {
-      await updateDoc(userRef, {
-        name,
-        lastName,
-        phoneNumber,
+      const { user } = await api('/account/profile', {
+        method: 'PATCH',
+        body: { name, lastName, phoneNumber },
       });
 
       dispatch({
         type: 'UPDATE_USER',
-        payload: { name, lastName, phoneNumber },
+        payload: {
+          name: user.name,
+          lastName: user.lastName,
+          phoneNumber: user.phoneNumber,
+        },
       });
-
-      setIsLoading(false);
     } catch (err) {
       console.error(err);
       setError(handleError(err));
+    } finally {
       setIsLoading(false);
     }
   };

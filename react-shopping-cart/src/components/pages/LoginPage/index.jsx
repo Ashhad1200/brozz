@@ -11,24 +11,12 @@ import styles from './index.module.scss';
 const LoginPage = () => {
   const { state: routerState } = useLocation();
 
-  const { login, signInWithGoogle, isLoading, error, defaultValue } = useAuth();
+  const { login, isLoading, error, defaultValue } = useAuth();
   const { sendToast } = useToast();
 
   const emailInput = useRef();
   const passwordInput = useRef();
 
-  const handleGoogleSignIn = async () => {
-    try {
-      await signInWithGoogle();
-    } catch (err) {
-      sendToast({
-        error: true,
-        content: {
-          message: err.message || 'An error occurred during Google sign in. Please try again.'
-        }
-      });
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -56,23 +44,6 @@ const LoginPage = () => {
               <div className={`${styles.wrapper} main-container`}>
                 <form onSubmit={handleSubmit} className={styles.form}>
                   <h2 className={styles.title}>Login</h2>
-
-                  <button 
-                    type="button"
-                    className={styles.google_button}
-                    onClick={handleGoogleSignIn}
-                  >
-                    <img 
-                      src="/google-icon.svg" 
-                      alt="Google" 
-                      className={styles.google_icon}
-                    />
-                    Continue with Google
-                  </button>
-
-                  <div className={styles.divider}>
-                    <span>or</span>
-                  </div>
 
                   <label className={styles.label}>
                     <span>Email:</span>
