@@ -6,7 +6,7 @@ and PostgreSQL.
 | Folder | What it is |
 |---|---|
 | [`react-shopping-cart/`](react-shopping-cart) | Frontend: React 18 + Vite |
-| [`server/`](server) | API: Node.js + Express + PostgreSQL (`pg`) |
+| [`server/`](server) | API: Node.js + Express + PostgreSQL via Prisma ORM |
 | [`e2e/`](e2e) | Browser tests (Playwright) that drive the real UI |
 | `Backend/` | Legacy MongoDB API. Nothing uses it; kept for reference. |
 
@@ -27,8 +27,8 @@ createdb -O brozz brozz_test # only needed to run the API tests
 ```bash
 cd server
 cp .env.example .env         # set DATABASE_URL and a long random JWT_SECRET
-npm install
-npm run seed                 # creates tables, loads the demo catalog
+npm install                  # also generates the Prisma client
+npm run seed                 # applies migrations, loads the demo catalog
 npm run create-admin -- you@example.com 'YourPassw0rd!'
 npm run dev                  # http://localhost:8000
 ```
@@ -86,13 +86,27 @@ out, the cart is trimmed and the shopper is told.
 **Payments are mocked.** The card is checked for shape and expiry, and only the
 cardholder name and last four digits are stored.
 
-### Database tables
+### Database (Prisma)
 
-`users`, `addresses`, `products`, `variants`, `skus` (stock per size),
+The schema lives in [`server/prisma/schema.prisma`](server/prisma/schema.prisma), and
+migrations live in `server/prisma/migrations/`. `npm start`, `npm run dev` and
+`npm run seed` apply pending migrations automatically (`prisma migrate deploy`).
+
+Tables: `users`, `addresses`, `products`, `variants`, `skus` (stock per size),
 `cart_items`, `checkout_sessions`, `orders` (items and addresses are snapshotted),
-`newsletter_subscribers`. The schema is in
-[`server/src/db/schema.sql`](server/src/db/schema.sql) and is applied automatically
-on start.
+`newsletter_subscribers`.
+
+| Task | Command (in `server/`) |
+|---|---|
+| Change the schema | edit `schema.prisma`, then `npm run db:migrate -- --name what_changed` |
+| Apply migrations (deploy) | `npm run db:deploy` |
+| Browse data | `npm run db:studio` |
+
+Prisma's query builder handles almost everything. The exceptions are the stock
+checks in cart and checkout, which use `$queryRaw` with `SELECT … FOR UPDATE`
+inside `prisma.$transaction`, because Prisma has no row-lock API. The CHECK
+constraints (no negative stock or prices) are added by hand in the first migration,
+since Prisma's schema language can't express them.
 
 ### API
 

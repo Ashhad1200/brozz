@@ -7,6 +7,7 @@ const multer = require('multer');
 
 const config = require('./config');
 const { HttpError } = require('./lib/errors');
+const { Prisma } = require('./db/prisma');
 const authRoutes = require('./routes/auth');
 const accountRoutes = require('./routes/account');
 const { router: productRoutes } = require('./routes/products');
@@ -60,11 +61,15 @@ const createApp = () => {
     if (err.type === 'entity.parse.failed') {
       return res.status(400).json({ message: 'Malformed JSON body' });
     }
-    if (err.code === '23505') {
-      // Postgres unique violation, e.g. a SKU code that's already taken.
-      return res
-        .status(409)
-        .json({ message: 'That value is already in use', detail: err.detail });
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      // Unique constraint, e.g. two requests racing to create the same email.
+      if (err.code === 'P2002') {
+        return res.status(409).json({ message: 'That value is already in use' });
+      }
+      // Record to update or delete no longer exists.
+      if (err.code === 'P2025') {
+        return res.status(404).json({ message: 'Not found' });
+      }
     }
 
     console.error(err);

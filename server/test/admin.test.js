@@ -7,7 +7,7 @@ const h = require('./helpers');
 const config = require('../src/config');
 
 before(h.resetDb);
-after(() => h.pool.end());
+after(() => h.prisma.$disconnect());
 
 const IMAGE = path.join(__dirname, '..', 'seed-images', 'productos-remera-ojos-negra-1.jpg');
 

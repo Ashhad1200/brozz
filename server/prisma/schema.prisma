@@ -1,0 +1,172 @@
+// Database schema for the Brozz shop.
+// After editing, create a migration with: npm run db:migrate -- --name <change>
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email             String?   @unique
+  passwordHash      String?   @map("password_hash")
+  name              String?
+  lastName          String?   @map("last_name")
+  phoneNumber       String?   @map("phone_number")
+  isAdmin           Boolean   @default(false) @map("is_admin")
+  // Guests get an anonymous user row so they can hold a cart before signing up.
+  isAnonymous       Boolean   @default(false) @map("is_anonymous")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastLoginAt       DateTime? @map("last_login_at") @db.Timestamptz(6)
+  passwordChangedAt DateTime? @map("password_changed_at") @db.Timestamptz(6)
+
+  addresses       Address[]
+  cartItems       CartItem[]
+  checkoutSession CheckoutSession?
+  orders          Order[]
+
+  @@map("users")
+}
+
+model Address {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  name         String
+  lastName     String   @map("last_name")
+  phoneNumber  String?  @map("phone_number")
+  address      String
+  zipCode      String   @map("zip_code")
+  city         String
+  state        String
+  isMain       Boolean  @default(false) @map("is_main")
+  displayOrder Int      @default(1) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkoutSessions CheckoutSession[]
+
+  @@index([userId], map: "addresses_user_idx")
+  @@map("addresses")
+}
+
+model Product {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug        String   @unique
+  model       String
+  type        String
+  collection  String
+  description String   @default("")
+  fit         String?
+  baseSku     String   @map("base_sku")
+  sizes       String[] @default([])
+  tags        Json     @default("[]")
+  // Pool of uploaded images the admin can assign to variants: [{id, name, src}]
+  images      Json     @default("[]")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  variants Variant[]
+  skus     Sku[]
+
+  @@index([collection], map: "products_collection_idx")
+  @@map("products")
+}
+
+model Variant {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId    String   @map("product_id") @db.Uuid
+  color        String
+  colorDisplay String?  @map("color_display")
+  price        Decimal  @db.Decimal(10, 2)
+  actualPrice  Decimal  @map("actual_price") @db.Decimal(10, 2)
+  images       Json     @default("[]")
+  position     Int      @default(0)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  skus    Sku[]
+
+  @@index([productId], map: "variants_product_idx")
+  @@map("variants")
+}
+
+// One row per variant + size; holds the stock level.
+model Sku {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  variantId String   @map("variant_id") @db.Uuid
+  sku       String   @unique
+  size      String
+  quantity  Int      @default(0)
+  position  Int      @default(0)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   Variant    @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  cartItems CartItem[]
+
+  @@index([variantId], map: "skus_variant_idx")
+  @@map("skus")
+}
+
+model CartItem {
+  userId   String   @map("user_id") @db.Uuid
+  skuId    String   @map("sku_id") @db.Uuid
+  quantity Int
+  addedAt  DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sku  Sku  @relation(fields: [skuId], references: [id], onDelete: Cascade)
+
+  @@id([userId, skuId])
+  @@map("cart_items")
+}
+
+model CheckoutSession {
+  userId            String   @id @map("user_id") @db.Uuid
+  email             String?
+  shippingAddressId String?  @map("shipping_address_id") @db.Uuid
+  shippingOption    Json     @default("{\"standard\": false, \"expedited\": false}") @map("shipping_option")
+  shippingCost      Decimal  @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shippingAddress Address? @relation(fields: [shippingAddressId], references: [id], onDelete: SetNull)
+
+  @@map("checkout_sessions")
+}
+
+model Order {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  email           String
+  // Snapshots, so later product or address edits don't rewrite order history.
+  items           Json
+  shippingAddress Json     @map("shipping_address")
+  billingAddress  Json     @map("billing_address")
+  shippingOption  Json     @map("shipping_option")
+  shippingCost    Decimal  @map("shipping_cost") @db.Decimal(10, 2)
+  subtotal        Decimal  @db.Decimal(10, 2)
+  total           Decimal  @db.Decimal(10, 2)
+  // Only the cardholder name and last four digits are kept.
+  paymentInfo     Json     @map("payment_info")
+  status          String   @default("pending")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)], map: "orders_user_idx")
+  @@map("orders")
+}
+
+model NewsletterSubscriber {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email     String   @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("newsletter_subscribers")
+}

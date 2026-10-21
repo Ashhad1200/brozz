@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 
 before(h.resetDb);
-after(() => h.pool.end());
+after(() => h.prisma.$disconnect());
 
 test('lists every variant as a card with pagination', async () => {
   const first = await h.api().get('/api/products?limit=4').expect(200);
