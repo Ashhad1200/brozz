@@ -1,95 +1,39 @@
 import { useState } from 'react';
 
-import moment from 'moment';
-
-import {
-  writeBatch,
-  doc,
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-  addDoc,
-  increment,
-  serverTimestamp
-} from 'firebase/firestore';
-
-import { db } from '../firebase/firebase-config';
-
-import { useAuthContext } from './useAuthContext';
 import { useCartContext } from './useCartContext';
-import { useCheckoutContext } from './useCheckoutContext';
-import { useCart } from './useCart';
-import { useCheckout } from './useCheckout';
 
 import { handleError } from 'helpers/error/handleError';
+import { api } from '../api/client';
 
 export const useOrder = () => {
-  const { user } = useAuthContext();
-  const { items } = useCartContext();
-  const { email, shippingAddress, shippingOption, shippingCost } =
-    useCheckoutContext();
-  const { deleteCart } = useCart();
-  const { deleteCheckoutSession } = useCheckout();
+  const { dispatch: dispatchCartAction } = useCartContext();
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const ordersRef = collection(db, 'orders');
-
+  // The server re-checks stock, prices and shipping, then clears the cart.
   const createOrder = async (paymentInfo, billingAddress) => {
     setError(null);
     setIsLoading(true);
-    
-    const batch = writeBatch(db);
-    
+
     try {
-      // Update inventory
-      for (const item of items) {
-        const skuRef = doc(
-          collection(db, 'products', item.productId, 'skus'),
-          item.skuId
-        );
-        batch.update(skuRef, { 
-          quantity: increment(-item.quantity),
-          lastUpdated: serverTimestamp()
-        });
-      }
+      const { order } = await api('/orders', {
+        method: 'POST',
+        body: { payment: paymentInfo, billingAddress },
+      });
 
-      // Commit inventory updates
-      await batch.commit();
-
-      // Create order
-      const orderData = {
-        createdAt: serverTimestamp(),
-        items,
-        email,
-        shippingAddress,
-        shippingOption,
-        shippingCost,
-        paymentInfo,
-        billingAddress,
-        createdBy: user.uid,
-        status: 'pending',
-        total: items.reduce((sum, item) => sum + (item.price * item.quantity), 0) + shippingCost
-      };
-
-      const orderRef = await addDoc(ordersRef, orderData);
-
-      // Clean up cart and checkout session
-      await Promise.all([
-        deleteCart(),
-        deleteCheckoutSession()
-      ]);
-
-      setIsLoading(false);
-      return orderRef.id;
+      dispatchCartAction({ type: 'DELETE_CART' });
+      return order.id;
     } catch (err) {
       console.error(err);
+      // Stock changed while checking out: show the trimmed cart.
+      if (err.status === 409 && err.data?.items) {
+        dispatchCartAction({ type: 'UPDATE_CART', payload: err.data.items });
+      }
       setError(handleError(err));
-      setIsLoading(false);
       return null;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -98,26 +42,14 @@ export const useOrder = () => {
     setIsLoading(true);
 
     try {
-      const q = query(
-        ordersRef,
-        where('createdBy', '==', user.uid),
-        orderBy('createdAt', 'desc')
-      );
-
-      const querySnapshot = await getDocs(q);
-      const orders = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || null
-      }));
-
-      setIsLoading(false);
+      const { orders } = await api('/orders');
       return orders;
     } catch (err) {
       console.error(err);
       setError(handleError(err));
-      setIsLoading(false);
       return [];
+    } finally {
+      setIsLoading(false);
     }
   };
 

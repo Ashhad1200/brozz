@@ -4,22 +4,17 @@
 .pnp.js
 
 # config
-firebase-config.jsx
-.firebase
-.firebaserc
 .env
 .env.local
 .env.development
 .env.production
-
-# data
-/src/data/products.json
 
 # testing
 /coverage
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store

@@ -11,10 +11,8 @@ export default defineConfig({
       assets: path.resolve('src/assets/'),
       components: path.resolve('src/components/'),
       context: path.resolve('src/context/'),
-      db: path.resolve('src/db/'),
       helpers: path.resolve('src/helpers/'),
       hooks: path.resolve('src/hooks/'),
-      data: path.resolve('src/data/'),
     },
   },
   css: {
@@ -24,8 +22,15 @@ export default defineConfig({
       },
     },
   },
+  server: {
+    // Forward API calls and uploaded images to the Express server in /server.
+    proxy: {
+      '/api': process.env.VITE_API_PROXY || 'http://localhost:8000',
+      '/uploads': process.env.VITE_API_PROXY || 'http://localhost:8000',
+    },
+  },
   build: {
-    outDir: 'public',
-    emptyOutDir: true
-  }
+    outDir: 'dist',
+    emptyOutDir: true,
+  },
 });

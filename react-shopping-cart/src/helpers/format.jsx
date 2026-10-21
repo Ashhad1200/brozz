@@ -1,9 +1,6 @@
 import moment from 'moment';
 
-export const formatPrice = (number) => {
-  // return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  return number + '.00';
-};
+export const formatPrice = (number) => Number(number || 0).toFixed(2);
 
 export const formatDiscount = ({ currentPrice, actualPrice }) => {
   const discountPercentage = Math.round(
@@ -63,8 +60,4 @@ export const formatCvv = (value) => {
   return cvvFormatted;
 };
 
-export const formatDate = (value) => {
-  const timestamp = `${value.seconds}.${value.nanoseconds}`;
-
-  return moment.unix(parseFloat(timestamp)).format('MM/DD/YY');
-};
+export const formatDate = (value) => moment(value).format('MM/DD/YY');

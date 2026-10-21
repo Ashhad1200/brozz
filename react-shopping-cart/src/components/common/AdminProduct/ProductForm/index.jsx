@@ -76,9 +76,9 @@ const ProductForm = ({
               <option value="" disabled>
                 Select your option
               </option>
-              <option value="remeras">remeras</option>
-              <option value="buzos">buzos</option>
-              <option value="accesorios">accesorios</option>
+              <option value="t-shirts">t-shirts</option>
+              <option value="hoodies-sweatshirts">hoodies & sweatshirts</option>
+              <option value="accessories">accessories</option>
             </select>
           </label>
           <label className={styles.label}>

@@ -181,26 +181,26 @@ const ProductPage = () => {
                         <p className={styles.color}>{selectedVariant.color}</p>
                         {(selectedProduct.tags ||
                           selectedVariant.variantPrice <
-                            selectedProduct.price) && (
+                            selectedVariant.actualPrice) && (
                           <ProductTags
                             currentPrice={selectedVariant.variantPrice}
-                            actualPrice={selectedProduct.price}
+                            actualPrice={selectedVariant.actualPrice}
                           />
                         )}
                       </div>
                       <div className={styles.price_wrapper}>
                         {selectedVariant.variantPrice <
-                        selectedProduct.price ? (
+                        selectedVariant.actualPrice ? (
                           <>
                             <span className={styles.discounted_price}>
                               ${formatPrice(selectedVariant.variantPrice)}
                             </span>
                             <span className={styles.crossed_price}>
-                              ${formatPrice(selectedProduct.price)}
+                              ${formatPrice(selectedVariant.actualPrice)}
                             </span>
                           </>
                         ) : (
-                          <span>${formatPrice(selectedProduct.price)}</span>
+                          <span>${formatPrice(selectedVariant.actualPrice)}</span>
                         )}
                       </div>
                     </div>
@@ -286,25 +286,25 @@ const ProductPage = () => {
                       <p className={styles.color}>{selectedVariant.color}</p>
                       {(selectedProduct.tags ||
                         selectedVariant.variantPrice <
-                          selectedProduct.price) && (
+                          selectedVariant.actualPrice) && (
                         <ProductTags
                           currentPrice={selectedVariant.variantPrice}
-                          actualPrice={selectedProduct.price}
+                          actualPrice={selectedVariant.actualPrice}
                         />
                       )}
                       <div className={styles.price_wrapper}>
                         {selectedVariant.variantPrice <
-                        selectedProduct.price ? (
+                        selectedVariant.actualPrice ? (
                           <>
                             <span className={styles.discounted_price}>
                               ${formatPrice(selectedVariant.variantPrice)}
                             </span>
                             <span className={styles.crossed_price}>
-                              ${formatPrice(selectedProduct.price)}
+                              ${formatPrice(selectedVariant.actualPrice)}
                             </span>
                           </>
                         ) : (
-                          <span>${formatPrice(selectedProduct.price)}</span>
+                          <span>${formatPrice(selectedVariant.actualPrice)}</span>
                         )}
                       </div>
                     </div>

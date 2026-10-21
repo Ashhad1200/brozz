@@ -1,18 +1,14 @@
 import { useState } from 'react';
 
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase/firebase-config';
-
 import { useCheckoutContext } from './useCheckoutContext';
-import { useAuthContext } from './useAuthContext';
 import { useAddress } from './useAddress';
+
+import { handleError } from 'helpers/error/handleError';
+import { api } from '../api/client';
 
 export const useCheckout = () => {
   const { dispatch } = useCheckoutContext();
-  const { user } = useAuthContext();
   const { createAddress } = useAddress();
-
-  const checkoutSessionRef = doc(db, 'checkoutSessions', user.uid);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -31,76 +27,57 @@ export const useCheckout = () => {
     try {
       const { email, ...shippingAddress } = userInput;
 
-      let formattedShippingAddress = shippingAddress;
+      let selectedAddress = shippingAddress;
 
       if (shippingAddress.value === 'new') {
-        await createAddress({
-          ...shippingAddress,
-        });
+        selectedAddress = await createAddress({ ...shippingAddress });
+        if (!selectedAddress) {
+          throw new Error('Could not save the new address');
+        }
       }
 
-      await setDoc(checkoutSessionRef, {
-        email,
-        shippingAddressId: formattedShippingAddress.id,
+      await api('/checkout/shipping-info', {
+        method: 'PUT',
+        body: { email, shippingAddressId: selectedAddress.id },
       });
 
       dispatch({
         type: 'SUBMIT_SHIPPING_INFO',
-        payload: { email, shippingAddress: formattedShippingAddress },
+        payload: { email, shippingAddress: selectedAddress },
       });
-
-      setIsLoading(false);
     } catch (err) {
       console.error(err);
-      setError(err);
+      setError(handleError(err));
+    } finally {
       setIsLoading(false);
     }
   };
 
   const selectShippingOption = (option) => {
-    let selectedOption;
-    if (option === 'standard') {
-      selectedOption = {
-        standard: true,
-        expedited: false,
-      };
-    } else {
-      selectedOption = {
-        standard: false,
-        expedited: true,
-      };
-    }
-
-    dispatch({ type: 'SELECT_SHIPPING_OPTION', payload: selectedOption });
+    dispatch({
+      type: 'SELECT_SHIPPING_OPTION',
+      payload: {
+        standard: option === 'standard',
+        expedited: option !== 'standard',
+      },
+    });
   };
 
-  const submitShippingOption = async ({ shippingOption, shippingCost = 0 }) => {
+  // The server decides what each option costs.
+  const submitShippingOption = async ({ shippingOption }) => {
     setError(null);
     setIsLoading(true);
     try {
-      await setDoc(checkoutSessionRef, {
-        shippingOption,
-        shippingCost,
+      const session = await api('/checkout/shipping-option', {
+        method: 'PUT',
+        body: { option: shippingOption.standard ? 'standard' : 'expedited' },
       });
 
-      dispatch({ type: 'SUBMIT_SHIPPING_OPTION', payload: shippingCost });
-
-      setIsLoading(false);
+      dispatch({ type: 'SUBMIT_SHIPPING_OPTION', payload: session.shippingCost });
     } catch (err) {
       console.error(err);
-      setError(err);
-      setIsLoading(false);
-    }
-  };
-
-  const deleteCheckoutSession = async () => {
-    setError(null);
-    setIsLoading(true);
-    try {
-      await deleteDoc(checkoutSessionRef);
-    } catch (err) {
-      console.error(err);
-      setError(err);
+      setError(handleError(err));
+    } finally {
       setIsLoading(false);
     }
   };
@@ -111,7 +88,6 @@ export const useCheckout = () => {
     submitShippingInfo,
     selectShippingOption,
     submitShippingOption,
-    deleteCheckoutSession,
     isLoading,
     error,
   };

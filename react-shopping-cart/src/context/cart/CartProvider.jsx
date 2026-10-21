@@ -1,15 +1,12 @@
 import { useReducer, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 
-import { doc, getDoc, collection, setDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../../firebase/firebase-config';
-
 import { useAuthContext } from 'hooks/useAuthContext';
 import { useToast } from 'hooks/useToast';
 
 import CartContext from './cart-context';
 
-import { updateCartAtLogin } from 'helpers/cart';
+import { api } from '../../api/client';
 
 const initialState = {
   items: [],
@@ -89,14 +86,12 @@ const CartProvider = ({ children }) => {
 
   const firstLoad = useRef(true);
 
+  // (Re)load the cart whenever the session changes: first visit, login, logout.
   useEffect(() => {
     if (user && state.isLogin) {
       dispatch({ type: 'CART_NOT_READY' });
       const getCart = async () => {
         try {
-          const cartRef = doc(db, 'carts', user.uid);
-          const cartDoc = await getDoc(cartRef);
-
           if (
             (location.pathname === '/cart' ||
               location.pathname === '/checkout') &&
@@ -106,143 +101,22 @@ const CartProvider = ({ children }) => {
           }
           firstLoad.current = false;
 
-          let currentCartItems = [];
-          let cartNeedsUpdate;
+          // The API trims quantities to available stock before answering.
+          const { items, warning } = await api('/cart');
 
-          if (cartDoc.exists()) {
-            const cartData = cartDoc.data();
-            if (cartData.items.length > 0) {
-              currentCartItems = cartData.items;
-            } else {
-              await deleteDoc(cartRef);
-            }
+          if (warning) {
+            sendToast({ error: true, content: { message: warning } });
           }
 
-          if (state.items.length > 0) {
-            cartNeedsUpdate = true;
-
-            const itemsForCartUpdate = [...state.items, ...currentCartItems];
-            currentCartItems = updateCartAtLogin(itemsForCartUpdate);
-          }
-
-          if (currentCartItems.length > 0) {
-            let fetchedProductsDocs = {};
-            let fetchedVariantsDocs = {};
-
-            const cartItemPromises = currentCartItems.map(async (item) => {
-              const skuRef = doc(
-                collection(db, 'products', item.productId, 'skus'),
-                item.skuId
-              );
-
-              const skuDoc = await getDoc(skuRef);
-
-              if (skuDoc.exists()) {
-                const skuData = skuDoc.data();
-
-                if (skuData.quantity > 0) {
-                  let currenItemQuantity = item.quantity;
-
-                  if (item.quantity > skuData.quantity) {
-                    cartNeedsUpdate = true;
-                    currenItemQuantity = skuData.quantity;
-                  }
-
-                  if (item.model) {
-                    return { ...item, quantity: currenItemQuantity };
-                  }
-
-                  let productData;
-                  let variantData;
-
-                  if (!fetchedProductsDocs[item.productId]) {
-                    const productRef = doc(db, 'products', item.productId);
-                    const productDoc = await getDoc(productRef);
-
-                    productData = productDoc.data();
-                    fetchedProductsDocs[item.productId] = productData;
-                  } else {
-                    productData = fetchedProductsDocs[item.productId];
-                  }
-
-                  if (!fetchedVariantsDocs[item.variantId]) {
-                    const variantRef = doc(
-                      collection(db, 'products', item.productId, 'variants'),
-                      item.variantId
-                    );
-                    const variantDoc = await getDoc(variantRef);
-
-                    variantData = variantDoc.data();
-                    fetchedVariantsDocs[item.variantId] = variantData;
-                  } else {
-                    variantData = fetchedVariantsDocs[item.variantId];
-                  }
-
-                  return {
-                    ...item,
-                    quantity: currenItemQuantity,
-                    size: skuData.size,
-                    model: productData.model,
-                    type: productData.type,
-                    color: variantData.color,
-                    price: variantData.variantPrice,
-                    slug: productData.slug + '-' + variantData.color,
-                    image: variantData.images[0].src,
-                  };
-                } else {
-                  cartNeedsUpdate = true;
-                  return null;
-                }
-              } else {
-                cartNeedsUpdate = true;
-                return null;
-              }
-            });
-
-            let populatedCartItems = await Promise.all(cartItemPromises);
-
-            if (cartNeedsUpdate) {
-              populatedCartItems = populatedCartItems.filter(
-                (item) => item !== null
-              );
-
-              const updatedItemsDb = populatedCartItems.map((item) => ({
-                skuId: item.skuId,
-                productId: item.productId,
-                variantId: item.variantId,
-                quantity: item.quantity,
-              }));
-
-              await setDoc(cartRef, {
-                items: updatedItemsDb,
-              });
-
-              sendToast({
-                error: true,
-                content: {
-                  message: 'Item quantities in cart have been updated!',
-                },
-              });
-            }
-
-            dispatch({
-              type: 'UPDATE_CART',
-              payload: populatedCartItems,
-            });
-          } else {
-            dispatch({
-              type: 'CART_IS_READY',
-            });
-          }
+          dispatch({ type: 'UPDATE_CART', payload: items });
         } catch (err) {
           console.error(err);
+          dispatch({ type: 'CART_IS_READY' });
         }
       };
       getCart();
     }
   }, [user]);
-
-  console.log('cart-context', state);
 
   return (
     <CartContext.Provider value={{ ...state, dispatch }}>

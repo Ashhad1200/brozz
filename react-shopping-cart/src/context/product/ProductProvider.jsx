@@ -2,11 +2,8 @@ import { useReducer, useEffect } from 'react';
 
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
-// import { db } from 'db/config';
-
 import ProductContext from './product-context';
-import { db } from '../../firebase/firebase-config';
+import { api } from '../../api/client';
 
 const initialState = {
   productIsReady: false,
@@ -76,93 +73,27 @@ const ProductProvider = ({ children }) => {
 
   const getProduct = async () => {
     try {
-      const slugArr = slugId.split('-');
-      const selectedColor = slugArr.pop();
-      const formattedSlug = slugArr.join('-');
-
-      const productsRef = collection(db, 'products');
-      const productQuery = query(
-        productsRef,
-        where('slug', '==', formattedSlug)
+      const { product, variantId } = await api(
+        `/products/slug/${encodeURIComponent(slugId)}`
+      );
+      const selectedVariant = product.variants.find(
+        (variant) => variant.variantId === variantId
       );
 
-      const productsSnapshot = await getDocs(productQuery);
-
-      const productDoc = productsSnapshot.docs[0];
-
-      if (productDoc) {
-        const variantsRef = collection(productDoc.ref, 'variants');
-        const variantCheckQuery = query(
-          variantsRef,
-          where('color', '==', selectedColor)
-        );
-
-        const variantCheckSnapshot = await getDocs(variantCheckQuery);
-
-        if (variantCheckSnapshot.size === 0) {
-          return { product: null, variant: null };
-        }
-
-        const productData = {
-          productId: productDoc.id,
-          ...productDoc.data(),
-        };
-
-        const skusRef = collection(productDoc.ref, 'skus');
-
-        const skusQuery = query(skusRef, orderBy('order'));
-
-        const skusSnapshot = await getDocs(skusQuery);
-
-        const skusData = skusSnapshot.docs.map((skuDoc) => ({
-          skuId: skuDoc.id,
-          ...skuDoc.data(),
-        }));
-
-        const variantsSnapshot = await getDocs(variantsRef);
-
-        const variants = [];
-
-        variantsSnapshot.forEach((variantDoc) =>
-          variants.push({
-            ...variantDoc.data(),
-            variantId: variantDoc.id,
-            sizes: skusData
-              .filter((sku) => sku.variantId === variantDoc.id)
-              .map((sku) => ({
-                skuId: sku.skuId,
-                value: sku.size,
-                quantity: sku.quantity,
-              })),
-          })
-        );
-
-        const selectedVariant = variants.find(
-          (variant) => variant.color === selectedColor
-        );
-
-        if (selectedVariant.sizes.length === 1) {
-          dispatch({
-            type: 'SINGLE_SIZE',
-            payload: {
-              selectedSkuId: selectedVariant.sizes[0].skuId,
-              quantity: selectedVariant.sizes[0].quantity,
-            },
-          });
-        }
-
-        return {
-          product: {
-            ...productData,
-            variants,
+      if (selectedVariant.sizes.length === 1) {
+        dispatch({
+          type: 'SINGLE_SIZE',
+          payload: {
+            selectedSkuId: selectedVariant.sizes[0].skuId,
+            quantity: selectedVariant.sizes[0].quantity,
           },
-          variant: selectedVariant,
-        };
-      } else {
-        return { product: null, variant: null };
+        });
       }
+
+      return { product, variant: selectedVariant };
     } catch (err) {
-      console.error(err);
+      if (err.status !== 404) console.error(err);
+      return { product: null, variant: null };
     }
   };
 
@@ -182,8 +113,6 @@ const ProductProvider = ({ children }) => {
       fetchProduct();
     }
   }, [slugId, slugState]);
-
-  console.log('product-context', state);
 
   return (
     <ProductContext.Provider value={{ ...state, dispatch }}>
