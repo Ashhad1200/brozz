@@ -61,6 +61,15 @@ const NavDrawerContent = ({ toggleSideNav }) => {
               Accessories
             </Link>
           </li>
+          <li>
+            <Link
+              to="/collections/jackets"
+              onClick={toggleSideNav}
+              className={styles.link}
+            >
+              Jackets
+            </Link>
+          </li>
         </ul>
         <ul className={styles.links_list}>
           <h2>Drops</h2>

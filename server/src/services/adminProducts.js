@@ -12,8 +12,18 @@ const {
 } = require('../lib/validate');
 const { slugify, colorSlug } = require('../lib/slug');
 
-const PRODUCT_COLLECTIONS = ['t-shirts', 'hoodies-sweatshirts', 'accessories'];
-const SIZE_CODES = { s: 'SM', m: 'MD', l: 'LG', xl: 'XL', xxl: 'XX', os: 'OS' };
+const PRODUCT_COLLECTIONS = ['t-shirts', 'hoodies-sweatshirts', 'accessories', 'jackets'];
+const SIZE_CODES = {
+  xs: 'XS',
+  s: 'SM',
+  m: 'MD',
+  l: 'LG',
+  xl: 'XL',
+  xxl: 'XX',
+  '3xl': '3X',
+  '4xl': '4X',
+  os: 'OS',
+};
 
 const readImage = (image) => {
   if (!image || typeof image.src !== 'string' || !image.src) {
@@ -270,7 +280,11 @@ const getProductForEdit = async (productId) => {
   });
   if (!product) throw notFound('Product not found');
 
-  const sizesInput = { s: false, m: false, l: false, xl: false, xxl: false };
+  const sizesInput = Object.fromEntries(
+    Object.keys(SIZE_CODES)
+      .filter((size) => size !== 'os')
+      .map((size) => [size, false])
+  );
   for (const size of product.sizes) sizesInput[size] = true;
 
   return {

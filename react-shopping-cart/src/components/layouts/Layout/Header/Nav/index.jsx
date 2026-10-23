@@ -144,6 +144,11 @@ const Navbar = ({ toggleSideNav, openCartModal }) => {
               Accessories
             </NavLink>
           </li>
+          <li>
+            <NavLink className={styles.link} to="/collections/jackets">
+              Jackets
+            </NavLink>
+          </li>
         </ul>
         <ul className={styles.icons_menu}>
           <li className={`${styles.search_icon} disabled-link`}>

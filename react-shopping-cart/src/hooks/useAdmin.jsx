@@ -16,6 +16,9 @@ export const useAdmin = () => {
     l: 'lg',
     xl: 'xl',
     xxl: 'xx',
+    xs: 'xs',
+    '3xl': '3x',
+    '4xl': '4x',
   };
 
   // Runs an admin request with shared loading/error handling.

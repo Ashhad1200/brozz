@@ -16,6 +16,7 @@ const validSlugs = [
   't-shirts',
   'hoodies-sweatshirts',
   'accessories',
+  'jackets',
 ];
 
 const CollectionPage = () => {

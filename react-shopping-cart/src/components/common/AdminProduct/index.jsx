@@ -53,11 +53,14 @@ const AdminProduct = ({
     tags: '',
     sku: productBaseSku || '',
     sizes: productSizesInput || {
+      xs: false,
       s: false,
       m: false,
       l: false,
       xl: false,
       xxl: false,
+      '3xl': false,
+      '4xl': false,
     },
   });
 

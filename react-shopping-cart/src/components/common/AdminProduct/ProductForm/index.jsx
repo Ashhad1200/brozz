@@ -79,6 +79,7 @@ const ProductForm = ({
               <option value="t-shirts">t-shirts</option>
               <option value="hoodies-sweatshirts">hoodies & sweatshirts</option>
               <option value="accessories">accessories</option>
+              <option value="jackets">jackets</option>
             </select>
           </label>
           <label className={styles.label}>

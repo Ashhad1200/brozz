@@ -9,7 +9,7 @@ const {
 const router = express.Router();
 
 // "products" is the catch-all collection that shows everything.
-const COLLECTIONS = ['products', 't-shirts', 'hoodies-sweatshirts', 'accessories'];
+const COLLECTIONS = ['products', 't-shirts', 'hoodies-sweatshirts', 'accessories', 'jackets'];
 
 router.get(
   '/',

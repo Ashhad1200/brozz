@@ -63,7 +63,16 @@ test('admin creates a product that shows up in the storefront', async () => {
   assert.equal(product.model, 'test model');
   assert.equal(product.description, 'A test product');
   assert.equal(product.baseSku, 'TST');
-  assert.deepEqual(product.sizesInput, { s: true, m: true, l: false, xl: false, xxl: false });
+  assert.deepEqual(product.sizesInput, {
+    xs: false,
+    s: true,
+    m: true,
+    l: false,
+    xl: false,
+    xxl: false,
+    '3xl': false,
+    '4xl': false,
+  });
   assert.deepEqual(product.variants[0].inventory, { s: 3, m: 0 });
 
   const page = await h.api().get('/api/products/slug/test-model-tee-lightblue').expect(200);
